@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+    
+    function isHOD() {
+      return getUserRole() == 'hod';
+    }
+    
+    function isFaculty() {
+      return getUserRole() == 'faculty';
+    }
+    
+    function isStudent() {
+      return getUserRole() == 'student';
+    }
+    
+    function getUserDepartment() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department;
+    }
+    
+    // Users collection - Role-based read access
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && isHOD() && resource.data.department == getUserDepartment();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+                       !request.resource.data.keys().hasAny(['role', 'isApproved']);
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Departments collection
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Subjects collection
+    match /subjects/{subjectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isAdmin() || isFaculty());
+      allow update: if isSignedIn() && (isAdmin() || (isFaculty() && resource.data.facultyId == request.auth.uid));
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Enrollments subcollection
+      match /enrollments/{studentId} {
+        allow read: if isSignedIn() && (isStudent() && request.auth.uid == studentId || isAdmin() || isFaculty());
+        allow create: if isSignedIn() && isAdmin();
+        allow update: if isSignedIn() && isAdmin();
+        allow delete: if isSignedIn() && isAdmin();
+      }
+      
+      // Materials subcollection
+      match /materials/{materialId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+        allow update: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+        allow delete: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+      }
+    }
+    
+    // Attendance collection - Students can only see their own
+    match /attendance/{subjectId} {
+      allow read: if isSignedIn() && (isFaculty() || isAdmin());
+      allow create: if isSignedIn() && isFaculty();
+      allow update: if isSignedIn() && isFaculty();
+      allow delete: if isSignedIn() && isAdmin();
+      
+      match /records/{date} {
+        allow read: if isSignedIn();
+        
+        match /students/{studentId} {
+          allow read: if isSignedIn() && (request.auth.uid == studentId || isFaculty() || isAdmin());
+          allow create: if isSignedIn() && isFaculty();
+          allow update: if isSignedIn() && isFaculty();
+        }
+      }
+    }
+    
+    // Assessments collection - Students can only see marks
+    match /assessments/{assessmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isFaculty();
+      allow update: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Marks subcollection - Students only their own
+      match /marks/{studentId} {
+        allow read: if isSignedIn() && (request.auth.uid == studentId || isFaculty() || isAdmin());
+        allow create: if isSignedIn() && isFaculty();
+        allow update: if isSignedIn() && isFaculty();
+      }
+    }
+    
+    // Assignments collection
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isFaculty();
+      allow update: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Submissions subcollection
+      match /submissions/{submissionId} {
+        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isFaculty() || isAdmin());
+        allow create: if isSignedIn() && isStudent();
+        allow update: if isSignedIn() && resource.data.studentId == request.auth.uid && !request.resource.data.keys().hasAny(['marksObtained', 'feedback', 'gradedAt', 'gradedBy']);
+        allow update: if isSignedIn() && isFaculty() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['marksObtained', 'feedback', 'gradedAt', 'gradedBy']);
+      }
+    }
+    
+    // Results collection - Students only their own
+    match /results/{resultId} {
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Timetable collection
+    match /timetable/{timetableId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Notifications collection - Users only their own
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if request.auth.uid != null;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && 
+                       !request.resource.data.keys().hasAny(['title', 'message', 'type']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Audit logs collection - Admin only
+    match /audit_logs/{logId} {
+      allow read: if isSignedIn() && isAdmin();
+      allow create: if request.auth != null;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // College announcements collection
+    match /college_announcements/{announcementId} {
+      allow read: if isSignedIn() && resource.data.isActive == true;
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

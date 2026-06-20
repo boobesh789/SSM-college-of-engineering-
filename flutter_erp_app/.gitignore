@@ -1,0 +1,101 @@
+.packages
+.dart_tool/
+build/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+os/Pods/
+ios/Podfile.lock
+os/.generated/
+.env
+.env.*
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+linux/flutter/generated_plugins.cmake
+linux/flutter/generated_plugins.cmake
+windows/flutter/generated_plugins.cmake
+windows/runner/GeneratedPluginRegistrant.h
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution
+/build/
+/dist/
+/.dart_tool/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Android
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/LocalSettings.properties
+key.properties
+
+# iOS
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vscode/*
+!**/ios/**/.vscode/settings.json
+**/ios/**/.idea/
+**/ios/.vagrant
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/app.flutterignore
+**/ios/Flutter/app.ipa
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/app.dSYM/
+**/ios/Flutter/app.zip
+**/ios/Flutter/Flutter.framework.dSYM.zip
+**/ios/GoogleService-Info.plist
+**/ios/firebase.json
+
+# Web
+lib/generated_plugin_registrant.dart
+
+# MacOS
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+
+# Coverage
+coverage/
+.coverage
+*.lcov
+
+# Local env files
+.env.local
+.env.*.local
+
+# Firebase
+.firebaserc
+.runtimeconfig.json
+firebase-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

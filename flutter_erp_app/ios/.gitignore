@@ -1,0 +1,16 @@
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Flutter.framework.dSYM.zip
+ios/GoogleService-Info.plist
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+ios/Runner/GeneratedPluginRegistrant.*
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/.idea/
+*.mobileprovision
+*.p12
+*.cer
+*.ipa

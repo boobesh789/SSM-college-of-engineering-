@@ -1,0 +1,12 @@
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+android/app/src/main/java/io/flutter/embedding/engine/FlutterEngine.java
+android/.gradle/
+android/build/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/key.properties
+android/app/google-services.json
+android/app/release/
+android/app/debug/
