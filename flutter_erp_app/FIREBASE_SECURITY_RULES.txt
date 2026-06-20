@@ -1,0 +1,259 @@
+// Firestore Security Rules for SSM Student Hub
+// Role-based access control implementation
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+    
+    function isHOD() {
+      return getUserRole() == 'hod';
+    }
+    
+    function isFaculty() {
+      return getUserRole() == 'faculty';
+    }
+    
+    function isStudent() {
+      return getUserRole() == 'student';
+    }
+    
+    function getUserDepartment() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department;
+    }
+    
+    function isOwnDocument() {
+      return request.auth.uid == resource.data.userId;
+    }
+    
+    function isOwnUserId() {
+      return request.auth.uid == resource.data.userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Users can read other users if they are admin or HOD (limited fields)
+      allow read: if isSignedIn() && isHOD() && resource.data.department == getUserDepartment();
+      
+      // Only admin can create users during registration approval
+      allow create: if isSignedIn() && isAdmin();
+      
+      // Users can update their own profile (limited fields)
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+                       !request.resource.data.keys().hasAny(['role', 'isApproved']);
+      
+      // Admin can update any user
+      allow update: if isSignedIn() && isAdmin();
+      
+      // Admin can delete users
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Departments collection
+    match /departments/{departmentId} {
+      // Anyone can read departments
+      allow read: if isSignedIn();
+      
+      // Only admin can create departments
+      allow create: if isSignedIn() && isAdmin();
+      
+      // Only admin can update departments
+      allow update: if isSignedIn() && isAdmin();
+      
+      // Only admin can delete departments
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Subjects collection
+    match /subjects/{subjectId} {
+      // Anyone can read subjects
+      allow read: if isSignedIn();
+      
+      // Faculty can read their assigned subjects
+      allow read: if isSignedIn() && isFaculty() && resource.data.facultyId == request.auth.uid;
+      
+      // Only admin and faculty (their own) can create subjects
+      allow create: if isSignedIn() && (isAdmin() || isFaculty());
+      
+      // Faculty can update their own subjects, admin can update any
+      allow update: if isSignedIn() && (isAdmin() || (isFaculty() && resource.data.facultyId == request.auth.uid));
+      
+      // Only admin can delete
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Enrollments subcollection
+      match /enrollments/{studentId} {
+        allow read: if isSignedIn() && (isStudent() && request.auth.uid == studentId || isAdmin() || isFaculty());
+        allow create: if isSignedIn() && isAdmin();
+        allow update: if isSignedIn() && isAdmin();
+        allow delete: if isSignedIn() && isAdmin();
+      }
+      
+      // Materials subcollection
+      match /materials/{materialId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+        allow update: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+        allow delete: if isSignedIn() && (get(/databases/$(database)/documents/subjects/$(subjectId)).data.facultyId == request.auth.uid);
+      }
+    }
+    
+    // Attendance collection
+    match /attendance/{subjectId} {
+      // Faculty can read and write attendance for their subjects
+      allow read: if isSignedIn() && (isFaculty() || isAdmin());
+      allow create: if isSignedIn() && isFaculty();
+      allow update: if isSignedIn() && isFaculty();
+      allow delete: if isSignedIn() && isAdmin();
+      
+      match /records/{date} {
+        allow read: if isSignedIn();
+        
+        match /students/{studentId} {
+          // Students can read their own attendance
+          allow read: if isSignedIn() && (request.auth.uid == studentId || isFaculty() || isAdmin());
+          
+          // Faculty can mark attendance
+          allow create: if isSignedIn() && isFaculty();
+          allow update: if isSignedIn() && isFaculty();
+        }
+      }
+    }
+    
+    // Assessments collection
+    match /assessments/{assessmentId} {
+      allow read: if isSignedIn();
+      
+      // Faculty can create assessments
+      allow create: if isSignedIn() && isFaculty();
+      
+      // Faculty can update their own assessments
+      allow update: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Marks subcollection
+      match /marks/{studentId} {
+        // Students can read their own marks
+        allow read: if isSignedIn() && (request.auth.uid == studentId || isFaculty() || isAdmin());
+        
+        // Faculty can enter marks
+        allow create: if isSignedIn() && isFaculty();
+        allow update: if isSignedIn() && isFaculty();
+      }
+    }
+    
+    // Assignments collection
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      
+      // Faculty can create assignments
+      allow create: if isSignedIn() && isFaculty();
+      
+      // Faculty can update their assignments
+      allow update: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      
+      allow delete: if isSignedIn() && isAdmin();
+      
+      // Submissions subcollection
+      match /submissions/{submissionId} {
+        // Students can read their own submissions
+        allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isFaculty() || isAdmin());
+        
+        // Students can submit assignments
+        allow create: if isSignedIn() && isStudent();
+        
+        // Students can update their own submissions if not graded
+        allow update: if isSignedIn() && resource.data.studentId == request.auth.uid && !request.resource.data.keys().hasAny(['marksObtained', 'feedback', 'gradedAt', 'gradedBy']);
+        
+        // Faculty can grade
+        allow update: if isSignedIn() && isFaculty() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['marksObtained', 'feedback', 'gradedAt', 'gradedBy']);
+      }
+    }
+    
+    // Results collection
+    match /results/{resultId} {
+      // Students can read their own results
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      
+      // Only admin can create and update results
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Timetable collection
+    match /timetable/{timetableId} {
+      // All authenticated users can read timetable
+      allow read: if isSignedIn();
+      
+      // Only admin can create/update/delete
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // System can create notifications (via Cloud Functions)
+      allow create: if request.auth.uid != null;
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && 
+                       !request.resource.data.keys().hasAny(['title', 'message', 'type']);
+      
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Audit logs collection
+    match /audit_logs/{logId} {
+      // Only admin can read audit logs
+      allow read: if isSignedIn() && isAdmin();
+      
+      // System can create logs (via Cloud Functions)
+      allow create: if request.auth != null;
+      
+      // Logs cannot be updated or deleted
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // College announcements collection
+    match /college_announcements/{announcementId} {
+      // All authenticated users can read active announcements
+      allow read: if isSignedIn() && resource.data.isActive == true;
+      
+      // Only admin can create
+      allow create: if isSignedIn() && isAdmin();
+      
+      // Only admin can update
+      allow update: if isSignedIn() && isAdmin();
+      
+      // Only admin can delete
+      allow delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
